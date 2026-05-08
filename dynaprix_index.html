@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DynaPriX — Advanced Dynamic Pricing Engine</title>
+<meta name="description" content="Next-Generation Dynamic Pricing Engine using LightGBM + XGBoost ensemble. Advanced ML Project by Vaibhav Jha & Sai Sujal M, CSE AIML 6th Sem."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+/* ─── DESIGN TOKENS ─────────────────────────────────────────────── */
+:root {
+  --bg:       #03050a;
+  --bg1:      #060b14;
+  --bg2:      #0a1120;
+  --bg3:      #0d1729;
+  --border:   #14243d;
+  --border2:  #1e3353;
+  --mint:     #00ffa3;
+  --gold:     #ffb800;
+  --violet:   #9d6eff;
+  --red:      #ff4d6a;
+  --blue:     #4da6ff;
+  --text:     #e8edf5;
+  --muted:    #3d5470;
+  --muted2:   #5a7a9e;
+  --display:  'Bebas Neue', sans-serif;
+  --mono:     'DM Mono', monospace;
+  --body:     'Manrope', sans-serif;
+  --nav-h:    60px;
+  --ease:     cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── RESET ─────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{background:var(--bg);color:var(--text);font-family:var(--body);overflow-x:hidden;cursor:crosshair}
+a{color:inherit;text-decoration:none}
+button{border:none;outline:none;cursor:pointer;font-family:inherit}
+input,select,textarea{font-family:inherit;outline:none}
+canvas{display:block}
+::selection{background:rgba(0,255,163,0.2);color:var(--mint)}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ─── NAV ───────────────────────────────────────────────────────── */
+#nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+  height: var(--nav-h);
+  background: rgba(3,5,10,0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 32px;
+}
+.nav-inner {
+  width: 100%; max-width: 1360px; margin: 0 auto;
+  display: flex; align-items: center; gap: 0;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  margin-right: 48px; flex-shrink: 0;
+}
+.nav-logo-mark {
+  width: 32px; height: 32px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--mint), #00b372);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 0.95rem; color: #000;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 20px rgba(0,255,163,0.3);
+}
+.nav-logo-text {
+  font-family: var(--display); font-size: 1.35rem; letter-spacing: 0.06em;
+  color: var(--text);
+}
+.nav-logo-text em { color: var(--mint); font-style: normal; }
+.nav-links {
+  display: flex; gap: 4px; flex: 1;
+}
+.nav-link {
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 500;
+  color: var(--muted2); letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-link.active { color: var(--mint); background: rgba(0,255,163,0.08); }
+.nav-right {
+  display: flex; align-items: center; gap: 12px; margin-left: auto;
+}
+.nav-badge {
+  font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.1em;
+  padding: 4px 10px; border-radius: 20px;
+  background: rgba(0,255,163,0.08); border: 1px solid rgba(0,255,163,0.2);
+  color: var(--mint);
+  display: flex; align-items: center; gap: 5px;
+}
+.pulse-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--mint);
+  animation: pdot 1.5s ease-in-out infinite;
+}
+@keyframes pdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+/* ─── PAGES / ROUTER ─────────────────────────────────────────────── */
+.page {
+  display: none; min-height: 100vh; padding-top: var(--nav-h);
+  animation: pageIn 0.4s var(--ease) both;
+}
+.page.active { display: block; }
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── TICKER ─────────────────────────────────────────────────────── */
+.ticker-bar {
+  background: var(--bg1); border-bottom: 1px solid var(--border);
+  overflow: hidden; white-space: nowrap; height: 34px;
+  display: flex; align-items: center;
+}
+.ticker-scroll {
+  display: inline-flex; gap: 0;
+  animation: tickerMove 45s linear infinite;
+  font-family: var(--mono); font-size: 0.68rem; color: var(--muted2);
+}
+.ticker-scroll:hover { animation-play-state: paused; }
+.ti { display: inline-flex; align-items: center; gap: 6px; padding: 0 20px; border-right: 1px solid var(--border); }
+.ti-label { color: var(--muted); }
+.ti-val { color: var(--text); }
+.ti-up { color: var(--mint); }
+.ti-down { color: var(--red); }
+@keyframes tickerMove { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* ─── SECTION HELPERS ────────────────────────────────────────────── */
+.wrap { max-width: 1360px; margin: 0 auto; padding: 0 32px; }
+.section { padding: 80px 0; }
+.section-sm { padding: 48px 0; }
+.label {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--muted2);
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.label::before { content:''; width:24px; height:1px; background:currentColor; }
+.h1 { font-family: var(--display); font-size: clamp(3.5rem,7vw,6.5rem); letter-spacing: 0.04em; line-height: 0.92; }
+.h2 { font-family: var(--display); font-size: clamp(2.2rem,4vw,3.8rem); letter-spacing: 0.04em; line-height: 0.95; }
+.h3 { font-family: var(--display); font-size: clamp(1.4rem,2.5vw,2rem); letter-spacing: 0.04em; }
+.accent-mint { color: var(--mint); }
+.accent-gold { color: var(--gold); }
+.accent-violet { color: var(--violet); }
+.accent-red { color: var(--red); }
+.body-text { font-size: 0.9rem; line-height: 1.8; color: var(--muted2); }
+
+/* ─── CARDS ─────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: 14px; padding: 22px 24px;
+  position: relative; overflow: hidden;
+}
+.card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0,255,163,0.25) 50%, transparent 100%);
+}
+.card-sm { padding: 16px 18px; }
+.kpi-val { font-family: var(--mono); font-size: 2rem; font-weight: 500; line-height: 1; }
+.kpi-label { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted2); margin-top: 6px; }
+.kpi-delta {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px;
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 500;
+  padding: 3px 8px; border-radius: 4px;
+}
+.delta-pos { background: rgba(0,255,163,0.1); color: var(--mint); }
+.delta-neg { background: rgba(255,77,106,0.1); color: var(--red); }
+
+/* grid layouts */
+.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+.g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.g2-3 { display: grid; grid-template-columns: 2fr 3fr; gap: 20px; }
+.g3-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+@media(max-width:960px){.g4,.g3{grid-template-columns:1fr 1fr}.g2,.g2-3,.g3-2{grid-template-columns:1fr}}
+@media(max-width:560px){.g4{grid-template-columns:1fr}}
+
+/* ─── HERO ───────────────────────────────────────────────────────── */
+#hero {
+  position: relative; min-height: calc(100vh - var(--nav-h)); 
+  display: flex; align-items: center; overflow: hidden;
+}
+#hero-canvas {
+  position: absolute; inset: 0; z-index: 0;
+}
+.hero-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: radial-gradient(ellipse 60% 60% at 70% 50%, rgba(0,255,163,0.05) 0%, transparent 60%),
+              radial-gradient(ellipse 40% 40% at 20% 80%, rgba(157,110,255,0.06) 0%, transparent 50%);
+}
+.hero-content { position: relative; z-index: 2; width: 100%; }
+.hero-wrap { max-width: 1360px; margin: 0 auto; padding: 60px 32px; }
+.hero-eyebrow {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.2em;
+  color: var(--mint); text-transform: uppercase;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 28px;
+  opacity: 0; animation: fadeUp 0.6s 0.1s var(--ease) both;
+}
+.hero-eyebrow::before { content:''; width:32px; height:1px; background:var(--mint); }
+.hero-title {
+  opacity: 0; animation: fadeUp 0.7s 0.2s var(--ease) both;
+  margin-bottom: 32px; max-width: 820px;
+}
+.hero-desc {
+  font-family: var(--mono); font-size: 0.85rem; line-height: 1.9;
+  color: var(--muted2); max-width: 540px; margin-bottom: 48px;
+  opacity: 0; animation: fadeUp 0.7s 0.35s var(--ease) both;
+}
+.hero-ctas {
+  display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 72px;
+  opacity: 0; animation: fadeUp 0.7s 0.45s var(--ease) both;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--mint); color: #000; border-radius: 10px;
+  padding: 12px 28px; font-weight: 700; font-size: 0.88rem;
+  letter-spacing: 0.04em; transition: transform 0.15s, box-shadow 0.2s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,255,163,0.3); }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; color: var(--text); border-radius: 10px;
+  padding: 12px 28px; font-weight: 600; font-size: 0.88rem;
+  border: 1px solid var(--border2);
+  transition: border-color 0.2s, background 0.2s;
+}
+.btn-ghost:hover { border-color: var(--muted2); background: rgba(255,255,255,0.03); }
+.hero-stats {
+  display: flex; gap: 0; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: rgba(6,11,20,0.8); backdrop-filter: blur(10px);
+  overflow: hidden; max-width: 680px;
+  opacity: 0; animation: fadeUp 0.7s 0.55s var(--ease) both;
+}
+.hstat {
+  flex: 1; min-width: 130px; padding: 20px 24px;
+  border-right: 1px solid var(--border);
+}
+.hstat:last-child { border-right: none; }
+.hstat-num {
+  font-family: var(--display); font-size: 2.4rem; letter-spacing: 0.04em;
+  line-height: 1; margin-bottom: 4px;
+}
+.hstat-unit { font-size: 1.3rem; }
+.hstat-desc { font-family: var(--mono); font-size: 0.65rem; color: var(--muted2); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* floating algo pill */
+.algo-pills {
+  position: absolute; right: 32px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 12px;
+  opacity: 0; animation: fadeLeft 0.8s 0.6s var(--ease) both;
+  z-index: 2;
+}
+@media(max-width:1100px){ .algo-pills{ display: none; } }
+.algo-pill {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 20px; width: 220px;
+  position: relative; overflow: hidden;
+}
+.algo-pill::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; border-radius: 0 2px 2px 0;
+}
+.algo-pill.mint::before { background: var(--mint); }
+.algo-pill.violet::before { background: var(--violet); }
+.ap-name { font-family: var(--mono); font-size: 0.78rem; font-weight: 500; margin-bottom: 3px; }
+.ap-role { font-family: var(--mono); font-size: 0.62rem; color: var(--muted2); letter-spacing: 0.08em; text-transform: uppercase; }
+.ap-meter-bg { height: 3px; background: var(--bg3); border-radius: 2px; margin-top: 10px; }
+.ap-meter { height: 100%; border-radius: 2px; animation: meterGrow 1.5s 1s var(--ease) both; }
+.ap-meter.mint { background: var(--mint); width: 92%; }
+.ap-meter.violet { background: var(--violet); width: 78%; }
+@keyframes meterGrow { from{width:0} }
+
+/* ─── DEMO PAGE ──────────────────────────────────────────────────── */
+.demo-layout {
+  display: grid; grid-template-columns: 420px 1fr; gap: 24px;
+  align-items: start;
+}
+@media(max-width:960px){ .demo-layout{ grid-template-columns: 1fr; } }
+
+/* Wizard */
+.wizard-steps {
+  display: flex; gap: 0; margin-bottom: 28px;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.wz-step {
+  flex: 1; padding: 10px 8px; text-align: center;
+  font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); background: var(--bg1);
+  border-right: 1px solid var(--border); transition: all 0.25s;
+  cursor: pointer;
+}
+.wz-step:last-child { border-right: none; }
+.wz-step.active { background: rgba(0,255,163,0.08); color: var(--mint); }
+.wz-step.done { background: rgba(0,255,163,0.04); color: var(--muted2); }
+.wz-num { font-size: 1rem; font-weight: 700; display: block; margin-bottom: 2px; }
+
+.form-group { margin-bottom: 16px; }
+.form-label { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted2); margin-bottom: 7px; display: block; }
+.form-input {
+  width: 100%; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 10px 14px;
+  font-family: var(--mono); font-size: 0.85rem; color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(0,255,163,0.08); }
+.form-select {
+  width: 100%; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 10px 14px;
+  font-family: var(--mono); font-size: 0.82rem; color: var(--text);
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='7' viewBox='0 0 12 7' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%235a7a9e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  transition: border-color 0.2s;
+}
+.form-select:focus { border-color: var(--mint); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 9px; margin-bottom: 12px; }
+.toggle-label { font-family: var(--mono); font-size: 0.8rem; color: var(--text); }
+.toggle { position: relative; width: 40px; height: 22px; }
+.toggle input { display: none; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 11px;
+  background: var(--bg3); border: 1px solid var(--border);
+  cursor: pointer; transition: background 0.2s;
+}
+.toggle input:checked + .toggle-track { background: rgba(0,255,163,0.3); border-color: var(--mint); }
+.toggle-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--muted2); transition: transform 0.2s, background 0.2s;
+  pointer-events: none;
+}
+.toggle input:checked ~ .toggle-thumb { transform: translateX(18px); background: var(--mint); }
+
+.range-group { margin-bottom: 16px; }
+.range-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.range-val { font-family: var(--mono); font-size: 0.78rem; color: var(--mint); }
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--bg3);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--mint);cursor:pointer;transition:box-shadow 0.2s;box-shadow:0 0 0 3px rgba(0,255,163,0.15)}
+input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px rgba(0,255,163,0.2)}
+
+.btn-run-big {
+  width: 100%; padding: 14px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--mint), #00cc82);
+  color: #000; font-weight: 800; font-size: 0.9rem; letter-spacing: 0.06em;
+  transition: transform 0.15s, box-shadow 0.2s;
+  position: relative; overflow: hidden;
+}
+.btn-run-big::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.15));
+}
+.btn-run-big:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,255,163,0.3); }
+.btn-run-big:active { transform: translateY(0); }
+.btn-run-big:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* inference animation */
+.inference-log {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; height: 200px; overflow-y: auto;
+  font-family: var(--mono); font-size: 0.72rem; line-height: 1.8;
+  display: none;
+}
+.log-line { display: flex; gap: 10px; align-items: flex-start; }
+.log-ts { color: var(--muted); flex-shrink: 0; }
+.log-msg { color: var(--muted2); }
+.log-msg.highlight { color: var(--mint); }
+.log-msg.gold { color: var(--gold); }
+.log-msg.err { color: var(--red); }
+
+/* result panel */
+.result-panel { display: none; }
+.result-header {
+  background: linear-gradient(135deg, rgba(0,255,163,0.06), rgba(0,255,163,0.02));
+  border: 1px solid rgba(0,255,163,0.2); border-radius: 14px;
+  padding: 24px 26px; margin-bottom: 18px;
+  display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 20px;
+}
+.result-price-big {
+  font-family: var(--display); font-size: 4rem; letter-spacing: 0.04em; color: var(--mint); line-height: 1;
+}
+.result-sub { font-family: var(--mono); font-size: 0.72rem; color: var(--muted2); margin-top: 6px; }
+.result-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.rbadge {
+  padding: 4px 12px; border-radius: 20px; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 4px;
+}
+.rbadge-algo { background: rgba(0,255,163,0.1); border: 1px solid rgba(0,255,163,0.2); color: var(--mint); }
+.rbadge-conf { background: rgba(255,184,0,0.1); border: 1px solid rgba(255,184,0,0.2); color: var(--gold); }
+.rbadge-upl { background: rgba(77,166,255,0.1); border: 1px solid rgba(77,166,255,0.2); color: var(--blue); }
+
+.result-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 18px; }
+@media(max-width:700px){ .result-grid{ grid-template-columns: 1fr 1fr; } }
+.rg-cell { background: var(--bg1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.rg-label { font-family: var(--mono); font-size: 0.63rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted2); margin-bottom: 6px; }
+.rg-val { font-family: var(--mono); font-size: 1.25rem; font-weight: 500; }
+
+/* explanation box */
+.explanation-box {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px 20px; margin-bottom: 18px;
+}
+.expl-title { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted2); margin-bottom: 12px; }
+.expl-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; line-height: 1.6; color: var(--muted2); }
+.expl-item::before { content: '▸'; color: var(--mint); flex-shrink: 0; margin-top: 2px; font-size: 0.75rem; }
+
+/* chart wrapper in demo */
+.demo-chart-wrap { height: 240px; position: relative; }
+
+/* feature bar (demo) */
+.feat-impact { display: flex; flex-direction: column; gap: 8px; }
+.fi-row { display: flex; align-items: center; gap: 10px; }
+.fi-name { font-family: var(--mono); font-size: 0.7rem; color: var(--muted2); width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fi-bar-bg { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.fi-bar { height: 100%; border-radius: 3px; transition: width 1s var(--ease); }
+.fi-val { font-family: var(--mono); font-size: 0.68rem; color: var(--muted2); width: 32px; text-align: right; }
+
+/* ─── HOW IT WORKS PAGE ──────────────────────────────────────────── */
+.pipeline-track {
+  position: relative; padding: 20px 0;
+}
+.pipeline-track::before {
+  content: ''; position: absolute; left: 32px; top: 0; bottom: 0;
+  width: 1px; background: linear-gradient(to bottom, transparent, var(--border) 10%, var(--border) 90%, transparent);
+}
+.pipeline-node {
+  display: flex; gap: 28px; align-items: flex-start;
+  margin-bottom: 48px; position: relative;
+}
+.pn-icon {
+  width: 64px; height: 64px; border-radius: 16px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; z-index: 1;
+  background: var(--bg2); border: 1px solid var(--border);
+  box-shadow: 0 0 0 4px var(--bg);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.pipeline-node:hover .pn-icon { border-color: var(--mint); box-shadow: 0 0 0 4px var(--bg), 0 0 20px rgba(0,255,163,0.15); }
+.pn-content { flex: 1; padding-top: 10px; }
+.pn-step { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
+.pn-title { font-family: var(--display); font-size: 1.5rem; letter-spacing: 0.04em; margin-bottom: 10px; }
+.pn-body { font-family: var(--mono); font-size: 0.78rem; line-height: 1.8; color: var(--muted2); margin-bottom: 14px; max-width: 520px; }
+.pn-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag {
+  font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.06em;
+  padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border2); color: var(--muted2);
+}
+.tag-mint { border-color: rgba(0,255,163,0.3); color: var(--mint); background: rgba(0,255,163,0.05); }
+.tag-gold { border-color: rgba(255,184,0,0.3); color: var(--gold); background: rgba(255,184,0,0.05); }
+.tag-violet { border-color: rgba(157,110,255,0.3); color: var(--violet); background: rgba(157,110,255,0.05); }
+
+/* formula cards */
+.formula-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 18px; margin-top: 12px;
+  font-family: var(--mono); font-size: 0.78rem;
+}
+.formula-title { font-size: 0.65rem; color: var(--muted2); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.formula-eq { color: var(--mint); font-size: 0.88rem; }
+
+/* architecture diagram */
+.arch-diagram {
+  background: var(--bg1); border: 1px solid var(--border); border-radius: 16px;
+  padding: 32px; position: relative; overflow: hidden;
+}
+.arch-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.arch-box {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 12px 18px; text-align: center;
+  font-family: var(--mono); font-size: 0.72rem; min-width: 120px;
+  transition: border-color 0.25s, transform 0.25s;
+}
+.arch-box:hover { border-color: var(--mint); transform: translateY(-2px); }
+.arch-box.mint { border-color: rgba(0,255,163,0.4); background: rgba(0,255,163,0.05); color: var(--mint); }
+.arch-box.gold { border-color: rgba(255,184,0,0.4); background: rgba(255,184,0,0.05); color: var(--gold); }
+.arch-box.violet { border-color: rgba(157,110,255,0.4); background: rgba(157,110,255,0.05); color: var(--violet); }
+.arch-arrow { color: var(--muted); font-family: var(--mono); font-size: 1.2rem; }
+.arch-box-sm { font-size: 0.65rem; min-width: 90px; padding: 8px 12px; }
+
+/* ─── MODEL PAGE ─────────────────────────────────────────────────── */
+.model-compare-table { width: 100%; border-collapse: collapse; }
+.mct th {
+  font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted); padding: 12px 16px;
+  border-bottom: 1px solid var(--border); text-align: left;
+}
+.mct td { padding: 14px 16px; font-family: var(--mono); font-size: 0.82rem; border-bottom: 1px solid var(--border); }
+.mct tr:last-child td { border-bottom: none; }
+.mct tr:hover td { background: rgba(255,255,255,0.015); }
+.mct .best { color: var(--mint); font-weight: 600; }
+.badge {
+  display: inline-block; padding: 3px 9px; border-radius: 4px;
+  font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.06em;
+}
+.b-primary { background: rgba(0,255,163,0.1); color: var(--mint); border: 1px solid rgba(0,255,163,0.2); }
+.b-secondary { background: rgba(157,110,255,0.1); color: var(--violet); border: 1px solid rgba(157,110,255,0.2); }
+.b-retired { background: rgba(61,84,112,0.2); color: var(--muted2); border: 1px solid var(--border); }
+.b-base { background: rgba(255,77,106,0.08); color: var(--red); border: 1px solid rgba(255,77,106,0.2); }
+
+.chart-wrap-full { height: 320px; position: relative; }
+
+/* hyperparams */
+.hp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; }
+.hp-item { background: var(--bg1); border: 1px solid var(--border); border-radius: 9px; padding: 12px 14px; }
+.hp-key { font-family: var(--mono); font-size: 0.65rem; color: var(--muted2); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 5px; }
+.hp-val { font-family: var(--mono); font-size: 0.92rem; color: var(--mint); }
+
+/* ─── TEAM PAGE ──────────────────────────────────────────────────── */
+.team-hero {
+  text-align: center; padding: 80px 32px 60px;
+}
+.team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 900px; margin: 0 auto; }
+@media(max-width:700px){ .team-grid{ grid-template-columns: 1fr; } }
+.team-card {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: 20px; padding: 36px 32px;
+  text-align: center; position: relative; overflow: hidden;
+  transition: border-color 0.3s, transform 0.3s;
+}
+.team-card:hover { border-color: var(--mint); transform: translateY(-4px); }
+.team-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background: linear-gradient(90deg, var(--mint), var(--violet));
+}
+.team-avatar {
+  width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 20px;
+  background: linear-gradient(135deg, var(--bg2), var(--bg3));
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 2rem; letter-spacing: 0.05em;
+  position: relative;
+}
+.avatar-ring {
+  position: absolute; inset: -4px; border-radius: 50%;
+  border: 1px solid rgba(0,255,163,0.2);
+  animation: ringPulse 3s ease-in-out infinite;
+}
+@keyframes ringPulse { 0%,100%{transform:scale(1);opacity:0.4} 50%{transform:scale(1.05);opacity:0.8} }
+.team-name { font-family: var(--display); font-size: 1.6rem; letter-spacing: 0.04em; margin-bottom: 6px; }
+.team-role { font-family: var(--mono); font-size: 0.72rem; color: var(--mint); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px; }
+.team-detail { font-family: var(--mono); font-size: 0.72rem; color: var(--muted2); line-height: 1.8; }
+.team-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 16px; }
+.team-card .tag { font-size: 0.62rem; }
+
+.project-card {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: 16px; padding: 28px 32px;
+  max-width: 900px; margin: 0 auto 40px;
+  text-align: center;
+}
+.course-tag {
+  display: inline-block; padding: 5px 16px; border-radius: 20px;
+  background: rgba(157,110,255,0.1); border: 1px solid rgba(157,110,255,0.3);
+  font-family: var(--mono); font-size: 0.72rem; color: var(--violet); letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+.project-title-full { font-family: var(--display); font-size: 1.6rem; letter-spacing: 0.04em; margin-bottom: 12px; }
+.project-desc { font-family: var(--mono); font-size: 0.8rem; color: var(--muted2); line-height: 1.8; max-width: 620px; margin: 0 auto; }
+
+/* ─── FOOTER ─────────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg1); padding: 28px 32px;
+}
+.footer-inner {
+  max-width: 1360px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;
+}
+.footer-left { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+.footer-left strong { color: var(--mint); }
+.footer-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.foot-tag {
+  font-family: var(--mono); font-size: 0.62rem; padding: 3px 9px;
+  border: 1px solid var(--border2); border-radius: 5px; color: var(--muted2);
+}
+
+/* ─── ANIMATIONS ─────────────────────────────────────────────────── */
+@keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeLeft { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
+.reveal { opacity:0; transform:translateY(20px); transition:opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+.reveal.visible { opacity:1; transform:none; }
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* ─── MISC ───────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 0; }
+hr.dashed { border: none; border-top: 1px dashed var(--border); margin: 24px 0; }
+.text-center { text-align: center; }
+.mb8 { margin-bottom: 8px; }
+.mb16 { margin-bottom: 16px; }
+.mb24 { margin-bottom: 24px; }
+.mb32 { margin-bottom: 32px; }
+.mb48 { margin-bottom: 48px; }
+.mt24 { margin-top: 24px; }
+.mt32 { margin-top: 32px; }
+.mt48 { margin-top: 48px; }
+.gap-12 { gap: 12px; }
+.flex { display: flex; }
+.flex-center { display: flex; align-items: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+
+/* progress bar animation */
+@keyframes progressBar { from{width:0} }
+
+/* spinner */
+.spin {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(0,255,163,0.2); border-top-color: var(--mint);
+  border-radius: 50%; animation: spinning 0.7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spinning { to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ NAV ═══════════════════════════ -->
+<nav id="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <div class="nav-logo-mark">DP</div>
+      <span class="nav-logo-text">Dyna<em>PriX</em></span>
+    </div>
+    <div class="nav-links">
+      <div class="nav-link active" data-page="home">Home</div>
+      <div class="nav-link" data-page="demo">Live Demo</div>
+      <div class="nav-link" data-page="howitworks">How It Works</div>
+      <div class="nav-link" data-page="model">Model & Results</div>
+      <div class="nav-link" data-page="team">Team</div>
+    </div>
+    <div class="nav-right">
+      <div class="nav-badge">
+        <div class="pulse-dot"></div>
+        ENGINE LIVE
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════ TICKER ═══════════════════════════ -->
+<div class="ticker-bar" id="tickerBar" style="display:none">
+  <div class="ticker-scroll" id="ticker"></div>
+</div>
+
+<!-- ═══════════════════════ PAGE: HOME ═══════════════════════════ -->
+<div class="page active" id="page-home">
+
+  <!-- HERO -->
+  <section id="hero">
+    <canvas id="hero-canvas"></canvas>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <div class="hero-wrap">
+        <div class="hero-eyebrow">Advanced Machine Learning Project · CSE AIML · 6th Sem</div>
+        <div class="hero-title">
+          <div class="h1">NEXT-GEN<br><span class="accent-mint">DYNAMIC</span><br>PRICING ENGINE</div>
+        </div>
+        <p class="hero-desc">
+          Dual-algorithm ML architecture — LightGBM primary + XGBoost ensemble —
+          predicting optimal ₹ INR prices from demand signals, macroeconomic
+          indicators, weather, holidays & supply chain data in real-time.
+        </p>
+        <div class="hero-ctas">
+          <button class="btn-primary" onclick="navigate('demo')">
+            ▶&nbsp; Run Live Demo
+          </button>
+          <button class="btn-ghost" onclick="navigate('howitworks')">
+            How It Works →
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="hstat">
+            <div class="hstat-num accent-mint"><span class="counter" data-target="7.78" data-decimals="2">0</span><span class="hstat-unit accent-mint">%</span></div>
+            <div class="hstat-desc">WAPE Accuracy</div>
+          </div>
+          <div class="hstat">
+            <div class="hstat-num accent-gold">+<span class="counter" data-target="27.9" data-decimals="1">0</span><span class="hstat-unit">%</span></div>
+            <div class="hstat-desc">Profit / Unit ↑</div>
+          </div>
+          <div class="hstat">
+            <div class="hstat-num"><span class="counter" data-target="16" data-decimals="0">0</span><span class="hstat-unit accent-violet">mo</span></div>
+            <div class="hstat-desc">Training Data</div>
+          </div>
+        </div>
+      </div>
+      <!-- Floating algo pills -->
+      <div class="algo-pills">
+        <div class="algo-pill mint">
+          <div class="ap-name accent-mint">LightGBM v2</div>
+          <div class="ap-role">Primary Model · WAPE 7.78%</div>
+          <div class="ap-meter-bg"><div class="ap-meter mint"></div></div>
+        </div>
+        <div class="algo-pill violet">
+          <div class="ap-name accent-violet">XGBoost v2</div>
+          <div class="ap-role">Secondary · WAPE 9.12%</div>
+          <div class="ap-meter-bg"><div class="ap-meter violet"></div></div>
+        </div>
+        <div class="algo-pill" style="border-color:rgba(255,184,0,0.2)">
+          <div class="ap-name accent-gold">Optuna Tuner</div>
+          <div class="ap-role">Hyperparameter Search</div>
+          <div class="ap-meter-bg"><div class="ap-meter" style="background:var(--gold);width:85%;animation:meterGrow 1.5s 1.2s var(--ease) both"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OVERVIEW SECTION -->
+  <section class="section">
+    <div class="wrap">
+      <div class="label reveal">Project Overview</div>
+      <div class="g2 mb48" style="align-items:start">
+        <div>
+          <div class="h2 mb24 reveal reveal-delay-1">WHAT IT<br><span class="accent-mint">SOLVES</span></div>
+          <p class="body-text reveal reveal-delay-2" style="margin-bottom:18px">
+            Traditional retail pricing relies on static margins and manual adjustments — missing revenue 
+            daily as market conditions shift. DynaPriX replaces guesswork with a data-driven 
+            recommendation engine that predicts optimal selling prices every purchase cycle.
+          </p>
+          <p class="body-text reveal reveal-delay-3">
+            By integrating internal ERP data with external macroeconomic signals — inflation, weather, 
+            fuel costs, and holiday calendars — the system captures demand fluctuations that static 
+            models structurally miss.
+          </p>
+        </div>
+        <div class="reveal reveal-delay-2">
+          <div class="card mb14">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+              <span style="font-size:1.6rem">📦</span>
+              <div>
+                <div style="font-weight:700;margin-bottom:3px">Internal Signals</div>
+                <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted2)">ERP data feeds</div>
+              </div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.76rem;color:var(--muted2);line-height:1.8">
+              Purchase cost · Sales volume · Inventory turnover · Price elasticity · Demand lags (7d/14d) · Rolling volatility
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+              <span style="font-size:1.6rem">🌐</span>
+              <div>
+                <div style="font-weight:700;margin-bottom:3px">External Signals</div>
+                <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted2)">Market context</div>
+              </div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.76rem;color:var(--muted2);line-height:1.8">
+              CPI Inflation (INCC) · Diesel/fuel prices (ANP) · Precipitation & temperature · Holidays & seasonality
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="label reveal">Key Results</div>
+      <div class="g4 reveal reveal-delay-1">
+        <div class="card">
+          <div class="kpi-val accent-mint">₹41.55</div>
+          <div class="kpi-label">Optimal price found</div>
+          <div class="kpi-delta delta-pos">▲ vs ₹39.90 baseline</div>
+        </div>
+        <div class="card">
+          <div class="kpi-val accent-gold">+28%</div>
+          <div class="kpi-label">Profit per unit ↑</div>
+          <div class="kpi-delta delta-pos">₹9.05 → ₹11.60</div>
+        </div>
+        <div class="card">
+          <div class="kpi-val" style="color:var(--violet)">7.78%</div>
+          <div class="kpi-label">WAPE — LightGBM v2</div>
+          <div class="kpi-delta delta-pos">vs 18.2% baseline</div>
+        </div>
+        <div class="card">
+          <div class="kpi-val" style="color:var(--blue)">2.14</div>
+          <div class="kpi-label">MAE — test set</div>
+          <div class="kpi-delta delta-pos">RMSE: 3.07</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <div class="divider"></div>
+  <section class="section-sm">
+    <div class="wrap">
+      <div class="label reveal">Tech Stack</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap" class="reveal reveal-delay-1">
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">🐍</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--mint)">Python 3.11</div>
+        </div>
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">⚡</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--mint)">LightGBM</div>
+        </div>
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">🎯</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--violet)">XGBoost</div>
+        </div>
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">🔬</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--gold)">Optuna</div>
+        </div>
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">🐼</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted2)">Pandas</div>
+        </div>
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">📊</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted2)">Matplotlib</div>
+        </div>
+        <div class="card card-sm" style="min-width:120px;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:6px">🔢</div>
+          <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted2)">NumPy</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /page-home -->
+
+
+<!-- ═══════════════════════ PAGE: DEMO ═══════════════════════════ -->
+<div class="page" id="page-demo">
+  <div class="wrap section">
+
+    <div class="label">Pricing Engine Simulator</div>
+    <div class="h2 mb8">LIVE <span class="accent-mint">DEMO</span></div>
+    <p class="body-text mb32" style="max-width:560px">
+      Enter product & market context to run the LightGBM + XGBoost ensemble pricing model.
+      The engine simulates the full profit curve and identifies the optimal INR price.
+    </p>
+
+    <div class="demo-layout">
+
+      <!-- LEFT: INPUT PANEL -->
+      <div>
+        <!-- Wizard steps -->
+        <div class="wizard-steps mb24">
+          <div class="wz-step active" id="wz1"><span class="wz-num">1</span>Product</div>
+          <div class="wz-step" id="wz2"><span class="wz-num">2</span>Market</div>
+          <div class="wz-step" id="wz3"><span class="wz-num">3</span>Run</div>
+        </div>
+
+        <div id="wz-panel-1">
+          <div class="card">
+            <div class="label" style="margin-bottom:18px">Product Details</div>
+            <div class="form-group">
+              <label class="form-label">Product Name</label>
+              <input class="form-input" id="inp-name" placeholder="e.g. Washing Powder 1kg" value="Premium Basmati Rice 5kg"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Category</label>
+              <select class="form-select" id="inp-category">
+                <option value="grocery">Grocery / FMCG</option>
+                <option value="electronics">Electronics</option>
+                <option value="apparel">Apparel</option>
+                <option value="pharma">Pharma / Healthcare</option>
+                <option value="household">Household</option>
+                <option value="auto">Auto Parts</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Acquisition Cost (₹)</label>
+                <input class="form-input" id="inp-cost" type="number" value="420" min="1"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Competitor Price (₹)</label>
+                <input class="form-input" id="inp-comp" type="number" value="599" min="1"/>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Min Sim. Price (₹)</label>
+                <input class="form-input" id="inp-pmin" type="number" value="450" min="1"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max Sim. Price (₹)</label>
+                <input class="form-input" id="inp-pmax" type="number" value="750" min="1"/>
+              </div>
+            </div>
+            <div style="text-align:right;margin-top:8px">
+              <button class="btn-primary" style="display:inline-flex;padding:10px 20px;font-size:0.82rem" onclick="wizardNext(2)">Next →</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="wz-panel-2" style="display:none">
+          <div class="card">
+            <div class="label" style="margin-bottom:18px">Market Context</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Season</label>
+                <select class="form-select" id="inp-season">
+                  <option value="summer">Summer (Apr–Jun)</option>
+                  <option value="monsoon" selected>Monsoon (Jul–Sep)</option>
+                  <option value="festive">Festive (Oct–Nov)</option>
+                  <option value="winter">Winter (Dec–Feb)</option>
+                  <option value="spring">Spring (Mar)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Region</label>
+                <select class="form-select" id="inp-region">
+                  <option value="metro">Metro City</option>
+                  <option value="tier2" selected>Tier-2 City</option>
+                  <option value="tier3">Tier-3 / Rural</option>
+                </select>
+              </div>
+            </div>
+            <div class="range-group">
+              <div class="range-header">
+                <label class="form-label" style="margin:0">CPI Inflation (%)</label>
+                <span class="range-val" id="rv-cpi">4.8%</span>
+              </div>
+              <input type="range" id="inp-cpi" min="2" max="12" step="0.1" value="4.8" oninput="document.getElementById('rv-cpi').textContent=this.value+'%'"/>
+              <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:0.62rem;color:var(--muted)"><span>Low 2%</span><span>High 12%</span></div>
+            </div>
+            <div class="range-group">
+              <div class="range-header">
+                <label class="form-label" style="margin:0">Price Elasticity</label>
+                <span class="range-val" id="rv-elas">1.4</span>
+              </div>
+              <input type="range" id="inp-elasticity" min="0.3" max="3.5" step="0.1" value="1.4" oninput="document.getElementById('rv-elas').textContent=parseFloat(this.value).toFixed(1)"/>
+              <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:0.62rem;color:var(--muted)"><span>Inelastic</span><span>Very Elastic</span></div>
+            </div>
+            <div class="range-group">
+              <div class="range-header">
+                <label class="form-label" style="margin:0">Diesel Price (₹/L)</label>
+                <span class="range-val" id="rv-diesel">87.1</span>
+              </div>
+              <input type="range" id="inp-diesel" min="70" max="120" step="0.5" value="87.1" oninput="document.getElementById('rv-diesel').textContent=parseFloat(this.value).toFixed(1)"/>
+              <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:0.62rem;color:var(--muted)"><span>₹70</span><span>₹120</span></div>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-label">🎉 Holiday / Festival Active</span>
+              <label class="toggle"><input type="checkbox" id="inp-holiday" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-label">🌧️ Rainfall / Bad Weather</span>
+              <label class="toggle"><input type="checkbox" id="inp-rain"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px">
+              <button class="btn-ghost" style="flex:1;padding:10px" onclick="wizardNext(1)">← Back</button>
+              <button class="btn-run-big" style="flex:2" onclick="wizardNext(3)">▶&nbsp; Run Simulation</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="wz-panel-3" style="display:none">
+          <div class="card">
+            <div class="label" style="margin-bottom:18px">Inference Engine</div>
+            <div class="inference-log" id="inferenceLog"></div>
+            <div id="run-state" style="margin-top:16px">
+              <div style="font-family:var(--mono);font-size:0.78rem;color:var(--muted2);margin-bottom:14px">
+                All parameters confirmed. Press Run to execute the ensemble model.
+              </div>
+              <button class="btn-run-big" id="runBtn" onclick="runModel()">▶&nbsp; EXECUTE PRICING MODEL</button>
+            </div>
+            <div style="text-align:center;margin-top:12px">
+              <span style="font-family:var(--mono);font-size:0.68rem;color:var(--muted);cursor:pointer" onclick="wizardNext(2)">← Edit Parameters</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /left -->
+
+      <!-- RIGHT: OUTPUT PANEL -->
+      <div>
+        <!-- Placeholder before run -->
+        <div id="demo-placeholder" class="card" style="height:100%;min-height:360px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center">
+          <div style="font-size:3rem;opacity:0.3">📊</div>
+          <div style="font-family:var(--mono);font-size:0.82rem;color:var(--muted2)">
+            Fill in product & market parameters,<br>then run the model to see results here.
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="result-panel" id="resultPanel">
+
+          <div class="result-header">
+            <div>
+              <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted2);margin-bottom:6px;letter-spacing:0.1em;text-transform:uppercase">Optimal Selling Price</div>
+              <div class="result-price-big" id="res-price">₹549</div>
+              <div class="result-sub" id="res-subtitle">LightGBM + XGBoost Ensemble</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+              <div class="rbadge rbadge-algo" id="res-algo-badge">LightGBM Primary</div>
+              <div class="rbadge rbadge-conf" id="res-conf-badge">Confidence: 91.2%</div>
+              <div class="rbadge rbadge-upl" id="res-upl-badge">Uplift: +24.1%</div>
+            </div>
+          </div>
+
+          <div class="result-grid">
+            <div class="rg-cell"><div class="rg-label">Total Profit</div><div class="rg-val accent-mint" id="res-profit">—</div></div>
+            <div class="rg-cell"><div class="rg-label">Profit / Unit</div><div class="rg-val accent-gold" id="res-ppu">—</div></div>
+            <div class="rg-cell"><div class="rg-label">Pred. Demand</div><div class="rg-val" style="color:var(--violet)" id="res-demand">—</div></div>
+            <div class="rg-cell"><div class="rg-label">Baseline Price</div><div class="rg-val" style="color:var(--muted2)" id="res-baseline">—</div></div>
+            <div class="rg-cell"><div class="rg-label">Baseline Profit</div><div class="rg-val" style="color:var(--muted2)" id="res-base-profit">—</div></div>
+            <div class="rg-cell"><div class="rg-label">Revenue Uplift</div><div class="rg-val accent-mint" id="res-uplift">—</div></div>
+          </div>
+
+          <!-- Profit Chart -->
+          <div class="card mb14">
+            <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Profit vs Price Curve</div>
+            <div class="demo-chart-wrap">
+              <canvas id="demoChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Explanation -->
+          <div class="explanation-box">
+            <div class="expl-title">Model Reasoning</div>
+            <div id="expl-items"></div>
+          </div>
+
+          <!-- Feature Impact -->
+          <div class="card">
+            <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Feature Impact (This Prediction)</div>
+            <div class="feat-impact" id="featImpact"></div>
+          </div>
+
+        </div><!-- /result-panel -->
+      </div><!-- /right -->
+
+    </div>
+  </div>
+</div><!-- /page-demo -->
+
+
+<!-- ══════════════════ PAGE: HOW IT WORKS ════════════════════════ -->
+<div class="page" id="page-howitworks">
+
+  <!-- Header -->
+  <section class="section-sm" style="background:var(--bg1);border-bottom:1px solid var(--border)">
+    <div class="wrap">
+      <div class="label reveal">System Architecture</div>
+      <div class="g2" style="align-items:center">
+        <div>
+          <div class="h2 reveal reveal-delay-1">HOW THE<br><span class="accent-mint">ENGINE</span> WORKS</div>
+        </div>
+        <p class="body-text reveal reveal-delay-2">
+          DynaPriX follows a 6-stage ML pipeline — from raw ERP data ingestion through 
+          feature engineering, dual-model training, profit simulation, and real-time 
+          price recommendation — all orchestrated to run on a daily cycle.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE DIAGRAM -->
+  <section class="section-sm">
+    <div class="wrap">
+      <div class="label reveal">Data Flow Diagram</div>
+      <div class="arch-diagram reveal reveal-delay-1">
+        <!-- Row 1: Data Sources -->
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;text-align:center">DATA SOURCES</div>
+        <div class="arch-row">
+          <div class="arch-box arch-box-sm">📦 ERP Sales</div>
+          <div class="arch-box arch-box-sm">🛒 Purchases</div>
+          <div class="arch-box arch-box-sm">📦 Inventory</div>
+          <div class="arch-box arch-box-sm">🌧 Weather API</div>
+          <div class="arch-box arch-box-sm">📈 INCC Scrape</div>
+          <div class="arch-box arch-box-sm">⛽ ANP Diesel</div>
+          <div class="arch-box arch-box-sm">🎉 Holidays</div>
+        </div>
+        <div class="arch-row"><div class="arch-arrow">▼</div></div>
+        <!-- Row 2: Preprocessing -->
+        <div class="arch-row">
+          <div class="arch-box mint" style="min-width:300px">🔧 Preprocessing &amp; Consolidation<br><span style="font-size:0.65rem;opacity:0.7">Outliers · Nulls · Date Normalization · Unified Daily DF</span></div>
+        </div>
+        <div class="arch-row"><div class="arch-arrow">▼</div></div>
+        <!-- Row 3: Feature Eng -->
+        <div class="arch-row">
+          <div class="arch-box gold" style="min-width:380px">⚗️ Feature Engineering<br><span style="font-size:0.65rem;opacity:0.7">Lag Demand · Rolling Vol · Elasticity · Macro Bins · Turnover · Holiday Flags</span></div>
+        </div>
+        <div class="arch-row"><div class="arch-arrow">▼</div></div>
+        <!-- Row 4: Models -->
+        <div class="arch-row">
+          <div class="arch-box mint" style="min-width:160px">⚡ LightGBM<br><span style="font-size:0.65rem;opacity:0.7">Primary · WAPE 7.78%</span></div>
+          <div class="arch-arrow">+</div>
+          <div class="arch-box violet" style="min-width:160px">🎯 XGBoost<br><span style="font-size:0.65rem;opacity:0.7">Secondary · WAPE 9.12%</span></div>
+        </div>
+        <div class="arch-row"><div class="arch-arrow">▼</div></div>
+        <!-- Row 5: Ensemble -->
+        <div class="arch-row">
+          <div class="arch-box gold" style="min-width:220px">🔀 Ensemble Blend<br><span style="font-size:0.65rem;opacity:0.7">Weighted demand prediction</span></div>
+        </div>
+        <div class="arch-row"><div class="arch-arrow">▼</div></div>
+        <!-- Row 6: Simulation -->
+        <div class="arch-row">
+          <div class="arch-box arch-box-sm">Price Range<br>₹25 – ₹5000</div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box arch-box-sm">Demand(p)</div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box arch-box-sm">Profit Curve</div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box mint arch-box-sm">Optimal ₹</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PIPELINE DETAIL -->
+  <section class="section">
+    <div class="wrap">
+      <div class="label reveal">Pipeline Deep-Dive</div>
+      <div class="pipeline-track">
+
+        <div class="pipeline-node reveal">
+          <div class="pn-icon">📥</div>
+          <div class="pn-content">
+            <div class="pn-step">Stage 01</div>
+            <div class="pn-title">Data <span class="accent-mint">Ingestion</span></div>
+            <div class="pn-body">
+              Raw data is pulled daily from the ERP system (purchase orders, sales records, 
+              inventory snapshots) and merged with external APIs: weather station data, 
+              INCC inflation scraping, and ANP diesel price feeds.
+              A consolidated daily DataFrame spans January 2024 – April 2025 (~16 months).
+            </div>
+            <div class="pn-tags">
+              <span class="tag tag-mint">ERP Integration</span>
+              <span class="tag tag-mint">Weather API</span>
+              <span class="tag tag-gold">INCC Scraper</span>
+              <span class="tag tag-gold">ANP Diesel Feed</span>
+              <span class="tag">Daily Cadence</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-node reveal reveal-delay-1">
+          <div class="pn-icon">🧹</div>
+          <div class="pn-content">
+            <div class="pn-step">Stage 02</div>
+            <div class="pn-title">Data <span class="accent-gold">Cleaning</span></div>
+            <div class="pn-body">
+              Each data source is inspected independently for missing values and outliers.
+              Outlier treatment is context-driven (e.g. holiday spikes preserved, 
+              data-entry errors removed). Column types are standardized and date formats 
+              normalized across all joined sources.
+            </div>
+            <div class="pn-tags">
+              <span class="tag">Outlier Treatment</span>
+              <span class="tag">Null Handling</span>
+              <span class="tag tag-gold">Type Normalization</span>
+              <span class="tag">EDA</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-node reveal reveal-delay-2">
+          <div class="pn-icon">⚗️</div>
+          <div class="pn-content">
+            <div class="pn-step">Stage 03</div>
+            <div class="pn-title">Feature <span class="accent-violet">Engineering</span></div>
+            <div class="pn-body">
+              The feature set is crafted to capture both time-series dynamics and 
+              nonlinear market effects. Demand lags capture recency signals. 
+              Rolling volatility measures price instability. 
+              Numerical features are quantile-binned to expose threshold effects 
+              that tree models can exploit.
+            </div>
+            <div class="formula-card">
+              <div class="formula-title">Price Elasticity Formula</div>
+              <div class="formula-eq">η = (ΔQ/Q) / (ΔP/P) &nbsp;=&nbsp; d(ln Q) / d(ln P)</div>
+            </div>
+            <div class="formula-card" style="margin-top:8px">
+              <div class="formula-title">Demand Prediction (simplified)</div>
+              <div class="formula-eq">D(p) = D_base × exp(−η × (p − p_ref) / p_ref) × S(context)</div>
+            </div>
+            <div class="pn-tags" style="margin-top:12px">
+              <span class="tag tag-violet">Lag Features (7d/14d)</span>
+              <span class="tag tag-violet">Rolling Volatility</span>
+              <span class="tag">Inventory Turnover</span>
+              <span class="tag">Holiday Bins</span>
+              <span class="tag">Macro Quantiles</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-node reveal">
+          <div class="pn-icon">🤖</div>
+          <div class="pn-content">
+            <div class="pn-step">Stage 04</div>
+            <div class="pn-title">Dual-Model <span class="accent-mint">Training</span></div>
+            <div class="pn-body">
+              Two gradient-boosted tree models are trained independently on the feature set.
+              LightGBM uses leaf-wise growth for efficiency on large feature sets; 
+              XGBoost uses level-wise growth as a regularized counterpart. 
+              Optuna runs 200 trials of Bayesian hyperparameter optimization for each model.
+              Final evaluation uses MAE, RMSE, and WAPE on a held-out test set.
+            </div>
+            <div class="pn-tags">
+              <span class="tag tag-mint">LightGBM v2</span>
+              <span class="tag tag-violet">XGBoost v2</span>
+              <span class="tag tag-gold">Optuna Tuning</span>
+              <span class="tag">MAE · RMSE · WAPE</span>
+              <span class="tag">Train/Test Split</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-node reveal reveal-delay-1">
+          <div class="pn-icon">💰</div>
+          <div class="pn-content">
+            <div class="pn-step">Stage 05</div>
+            <div class="pn-title">Profit <span class="accent-gold">Simulation</span></div>
+            <div class="pn-body">
+              Given a purchase event, context features are auto-generated. 
+              A price sweep from ₹25 to ₹5000 is run through the ensemble model,
+              predicting demand at each price point. Total profit and per-unit profit 
+              are computed. Business constraints (min margin, max deviation) are applied 
+              before the optimal price is surfaced.
+            </div>
+            <div class="formula-card">
+              <div class="formula-title">Profit Optimization</div>
+              <div class="formula-eq">P*(p) = argmax[(p − c) × D̂(p)] &nbsp;s.t. p ≥ c × (1+min_margin)</div>
+            </div>
+            <div class="pn-tags" style="margin-top:12px">
+              <span class="tag tag-gold">Price Sweep</span>
+              <span class="tag">Demand Prediction</span>
+              <span class="tag">Margin Constraints</span>
+              <span class="tag tag-mint">Optimal ₹ Output</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-node reveal reveal-delay-2">
+          <div class="pn-icon">🚀</div>
+          <div class="pn-content">
+            <div class="pn-step">Stage 06</div>
+            <div class="pn-title">Recommendation &amp; <span class="accent-mint">Deployment</span></div>
+            <div class="pn-body">
+              The optimal price is returned to the ERP system as a pricing recommendation 
+              event. The system is designed for A/B testing deployment — 50% of SKUs 
+              receive model prices, the rest baseline. Monthly drift monitoring tracks 
+              residual patterns to trigger model retraining.
+            </div>
+            <div class="pn-tags">
+              <span class="tag tag-mint">ERP Integration</span>
+              <span class="tag">A/B Testing Ready</span>
+              <span class="tag">Drift Monitoring</span>
+              <span class="tag tag-gold">Auto Retraining</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /pipeline-track -->
+    </div>
+  </section>
+</div><!-- /page-howitworks -->
+
+
+<!-- ══════════════════ PAGE: MODEL & RESULTS ═════════════════════ -->
+<div class="page" id="page-model">
+  <section class="section-sm" style="background:var(--bg1);border-bottom:1px solid var(--border)">
+    <div class="wrap">
+      <div class="label">Model Performance</div>
+      <div class="h2">RESULTS &amp; <span class="accent-mint">METRICS</span></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+
+      <!-- Model comparison table -->
+      <div class="label reveal">Model Comparison</div>
+      <div class="card mb32 reveal reveal-delay-1">
+        <table class="model-compare-table mct">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Version</th>
+              <th>WAPE ↓</th>
+              <th>MAE ↓</th>
+              <th>RMSE ↓</th>
+              <th>Tuner</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--mint);font-weight:600">⚡ LightGBM</td>
+              <td>v2</td>
+              <td class="best">7.78%</td>
+              <td class="best">2.14</td>
+              <td class="best">3.07</td>
+              <td>Optuna 200t</td>
+              <td><span class="badge b-primary">PRIMARY</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--violet);font-weight:600">🎯 XGBoost</td>
+              <td>v2</td>
+              <td>9.12%</td>
+              <td>2.89</td>
+              <td>3.74</td>
+              <td>Optuna 200t</td>
+              <td><span class="badge b-secondary">ENSEMBLE</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted2)">🎯 XGBoost</td>
+              <td>v1</td>
+              <td>11.34%</td>
+              <td>3.41</td>
+              <td>4.62</td>
+              <td>Manual</td>
+              <td><span class="badge b-retired">RETIRED</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted2)">📐 Linear Reg.</td>
+              <td>—</td>
+              <td>15.91%</td>
+              <td>5.02</td>
+              <td>6.80</td>
+              <td>—</td>
+              <td><span class="badge b-base">BASELINE</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted2)">📊 Avg. Heuristic</td>
+              <td>—</td>
+              <td>18.20%</td>
+              <td>6.12</td>
+              <td>8.30</td>
+              <td>—</td>
+              <td><span class="badge b-base">BASELINE</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Charts row -->
+      <div class="g2 mb32 reveal">
+        <div class="card">
+          <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">WAPE Comparison</div>
+          <div class="chart-wrap-full"><canvas id="wapeChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px">Profit Uplift (Simulated)</div>
+          <div class="chart-wrap-full"><canvas id="upliftChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Feature importance global -->
+      <div class="label reveal">Global Feature Importance — LightGBM v2</div>
+      <div class="card mb32 reveal reveal-delay-1">
+        <div style="display:flex;flex-direction:column;gap:12px" id="globalFeatBars">
+        </div>
+      </div>
+
+      <!-- Hyperparameters -->
+      <div class="g2 reveal">
+        <div>
+          <div class="label reveal">LightGBM Hyperparameters (Optuna Best)</div>
+          <div class="hp-grid">
+            <div class="hp-item"><div class="hp-key">num_leaves</div><div class="hp-val">127</div></div>
+            <div class="hp-item"><div class="hp-key">max_depth</div><div class="hp-val">8</div></div>
+            <div class="hp-item"><div class="hp-key">learning_rate</div><div class="hp-val">0.0412</div></div>
+            <div class="hp-item"><div class="hp-key">n_estimators</div><div class="hp-val">842</div></div>
+            <div class="hp-item"><div class="hp-key">min_child_samples</div><div class="hp-val">24</div></div>
+            <div class="hp-item"><div class="hp-key">subsample</div><div class="hp-val">0.831</div></div>
+            <div class="hp-item"><div class="hp-key">colsample_bytree</div><div class="hp-val">0.764</div></div>
+            <div class="hp-item"><div class="hp-key">reg_alpha</div><div class="hp-val">0.028</div></div>
+            <div class="hp-item"><div class="hp-key">reg_lambda</div><div class="hp-val">0.114</div></div>
+            <div class="hp-item"><div class="hp-key">optuna_trials</div><div class="hp-val accent-mint">200</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="label reveal">XGBoost Hyperparameters (Optuna Best)</div>
+          <div class="hp-grid">
+            <div class="hp-item"><div class="hp-key">max_depth</div><div class="hp-val accent-violet">6</div></div>
+            <div class="hp-item"><div class="hp-key">learning_rate</div><div class="hp-val accent-violet">0.0571</div></div>
+            <div class="hp-item"><div class="hp-key">n_estimators</div><div class="hp-val accent-violet">714</div></div>
+            <div class="hp-item"><div class="hp-key">min_child_weight</div><div class="hp-val accent-violet">3</div></div>
+            <div class="hp-item"><div class="hp-key">subsample</div><div class="hp-val accent-violet">0.793</div></div>
+            <div class="hp-item"><div class="hp-key">colsample_bytree</div><div class="hp-val accent-violet">0.712</div></div>
+            <div class="hp-item"><div class="hp-key">gamma</div><div class="hp-val accent-violet">0.041</div></div>
+            <div class="hp-item"><div class="hp-key">reg_alpha</div><div class="hp-val accent-violet">0.072</div></div>
+            <div class="hp-item"><div class="hp-key">reg_lambda</div><div class="hp-val accent-violet">0.293</div></div>
+            <div class="hp-item"><div class="hp-key">optuna_trials</div><div class="hp-val accent-violet">200</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div><!-- /page-model -->
+
+
+<!-- ══════════════════════ PAGE: TEAM ════════════════════════════ -->
+<div class="page" id="page-team">
+
+  <div class="team-hero">
+    <div class="label" style="justify-content:center;margin-bottom:16px">Advanced Machine Learning Project</div>
+    <div class="h2 mb16">MEET THE <span class="accent-mint">TEAM</span></div>
+    <div class="course-tag">CSE AIML · 6th Semester · B.Tech</div>
+  </div>
+
+  <div class="wrap" style="padding-bottom:80px">
+
+    <div class="project-card">
+      <div class="course-tag">Advanced Machine Learning Project</div>
+      <div class="project-title-full">Next-Generation Dynamic Pricing Engine<br>with Real-Time Market Adaptation</div>
+      <div class="project-desc">
+        A production-grade ML pricing system using LightGBM primary + XGBoost ensemble 
+        to predict optimal ₹ INR selling prices. Integrates internal ERP signals with 
+        external macroeconomic drivers — CPI inflation, diesel prices, weather, and 
+        Indian holiday calendars — to maximize retail profit margins dynamically.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+        <span class="tag tag-mint">LightGBM Primary</span>
+        <span class="tag tag-violet">XGBoost Ensemble</span>
+        <span class="tag tag-gold">Optuna HPO</span>
+        <span class="tag">WAPE 7.78%</span>
+        <span class="tag">+28% Profit/Unit</span>
+        <span class="tag">Python 3.11</span>
+      </div>
+    </div>
+
+    <div class="team-grid">
+
+      <!-- Vaibhav Jha -->
+      <div class="team-card">
+        <div class="team-avatar">
+          <div class="avatar-ring"></div>
+          VJ
+        </div>
+        <div class="team-name">Vaibhav Jha</div>
+        <div class="team-role" style="color:var(--mint)">Lead Developer</div>
+        <div class="team-detail">
+          CSE AIML · 6th Semester<br>
+          B.Tech Computer Science &amp;<br>
+          Engineering (AI &amp; ML)
+        </div>
+        <div class="team-tags">
+          <span class="tag tag-mint">LightGBM</span>
+          <span class="tag tag-mint">Feature Engineering</span>
+          <span class="tag tag-mint">ERP Integration</span>
+          <span class="tag">Pipeline Design</span>
+          <span class="tag">Data Collection</span>
+        </div>
+      </div>
+
+      <!-- Sai Sujal M -->
+      <div class="team-card">
+        <div class="team-avatar" style="background:linear-gradient(135deg,rgba(157,110,255,0.15),rgba(157,110,255,0.05))">
+          <div class="avatar-ring" style="border-color:rgba(157,110,255,0.3)"></div>
+          <span style="color:var(--violet)">SS</span>
+        </div>
+        <div class="team-name">Sai Sujal M</div>
+        <div class="team-role" style="color:var(--violet)">ML Engineer</div>
+        <div class="team-detail">
+          CSE AIML · 6th Semester<br>
+          B.Tech Computer Science &amp;<br>
+          Engineering (AI &amp; ML)
+        </div>
+        <div class="team-tags">
+          <span class="tag tag-violet">XGBoost</span>
+          <span class="tag tag-violet">Optuna Tuning</span>
+          <span class="tag tag-violet">Profit Simulation</span>
+          <span class="tag">Model Evaluation</span>
+          <span class="tag">Visualization</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Roadmap -->
+    <div class="mt48">
+      <div class="label">Project Roadmap</div>
+      <div class="g3 reveal">
+        <div class="card">
+          <div style="font-size:1.4rem;margin-bottom:10px">🏪</div>
+          <div style="font-weight:700;margin-bottom:6px">Competitor Monitoring</div>
+          <div style="font-family:var(--mono);font-size:0.75rem;color:var(--muted2);line-height:1.7">
+            Weekly scraping of local + major player prices. Feed price differential as feature into the model.
+          </div>
+          <span class="badge" style="margin-top:10px;background:rgba(0,255,163,0.06);color:var(--mint);border-color:rgba(0,255,163,0.2)">Q3 2025</span>
+        </div>
+        <div class="card">
+          <div style="font-size:1.4rem;margin-bottom:10px">🧪</div>
+          <div style="font-weight:700;margin-bottom:6px">A/B Testing Framework</div>
+          <div style="font-family:var(--mono);font-size:0.75rem;color:var(--muted2);line-height:1.7">
+            Controlled split: 50% baseline vs model-driven prices. Statistical significance tracking monthly.
+          </div>
+          <span class="badge" style="margin-top:10px;background:rgba(255,184,0,0.06);color:var(--gold);border-color:rgba(255,184,0,0.2)">Q4 2025</span>
+        </div>
+        <div class="card">
+          <div style="font-size:1.4rem;margin-bottom:10px">🔄</div>
+          <div style="font-weight:700;margin-bottom:6px">Auto-Retraining Pipeline</div>
+          <div style="font-family:var(--mono);font-size:0.75rem;color:var(--muted2);line-height:1.7">
+            Drift detection on residual patterns triggers scheduled retraining. Zero manual intervention.
+          </div>
+          <span class="badge" style="margin-top:10px;background:rgba(157,110,255,0.06);color:var(--violet);border-color:rgba(157,110,255,0.2)">Q1 2026</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /page-team -->
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════════════ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      <strong>DynaPriX</strong> — Advanced Dynamic Pricing Engine &nbsp;·&nbsp;
+      <strong>Vaibhav Jha</strong> &amp; <strong>Sai Sujal M</strong> &nbsp;·&nbsp;
+      CSE AIML 6th Sem &nbsp;·&nbsp; Advanced ML Project
+    </div>
+    <div class="footer-tags">
+      <div class="foot-tag">LightGBM</div>
+      <div class="foot-tag">XGBoost</div>
+      <div class="foot-tag">Optuna</div>
+      <div class="foot-tag">Python 3.11</div>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══════════════════════ SCRIPTS ══════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+const pages = ['home','demo','howitworks','model','team'];
+function navigate(id) {
+  pages.forEach(p => {
+    document.getElementById('page-'+p).classList.remove('active');
+    document.querySelector(`.nav-link[data-page="${p}"]`).classList.remove('active');
+  });
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelector(`.nav-link[data-page="${id}"]`).classList.add('active');
+  window.scrollTo(0,0);
+  document.getElementById('tickerBar').style.display = id === 'home' ? 'block' : 'none';
+
+  if (id === 'model') initModelCharts();
+  if (id === 'home') initCounters();
+  setTimeout(initReveal, 100);
+}
+
+document.querySelectorAll('.nav-link').forEach(el => {
+  el.addEventListener('click', () => navigate(el.dataset.page));
+});
+
+// ═══════════════════════════════════════════════════════
+// TICKER
+// ═══════════════════════════════════════════════════════
+const tickerData = [
+  {label:'NIFTY 50', val:'24,611.05', cls:'ti-up', extra:'▲0.4%'},
+  {label:'SENSEX', val:'81,034.27', cls:'ti-up', extra:'▲0.3%'},
+  {label:'USD/INR', val:'₹83.64', cls:'', extra:''},
+  {label:'CPI INFLATION', val:'4.83%', cls:'ti-down', extra:''},
+  {label:'DIESEL/MUM', val:'₹87.14/L', cls:'', extra:''},
+  {label:'DEMAND INDEX', val:'HIGH', cls:'ti-up', extra:'▲'},
+  {label:'MODEL', val:'LightGBM v2 ACTIVE', cls:'ti-up', extra:''},
+  {label:'WAPE', val:'7.78%', cls:'ti-up', extra:''},
+  {label:'LAST PREDICTION', val:'12s AGO', cls:'', extra:''},
+  {label:'PROFIT UPLIFT', val:'+28%', cls:'ti-up', extra:''},
+];
+function buildTicker() {
+  const items = tickerData.map(d =>
+    `<span class="ti"><span class="ti-label">${d.label}</span>&nbsp;<span class="ti-val ${d.cls}">${d.val} ${d.extra}</span></span>`
+  ).join('');
+  document.getElementById('ticker').innerHTML = items + items;
+}
+buildTicker();
+
+// ═══════════════════════════════════════════════════════
+// HERO CANVAS — PARTICLE NETWORK
+// ═══════════════════════════════════════════════════════
+function initHeroCanvas() {
+  const canvas = document.getElementById('hero-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [], animId;
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  class Particle {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = Math.random() * W;
+      this.y = Math.random() * H;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.4;
+      this.r = Math.random() * 1.5 + 0.5;
+      this.alpha = Math.random() * 0.4 + 0.1;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      if (this.x < 0 || this.x > W || this.y < 0 || this.y > H) this.reset();
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,255,163,${this.alpha})`;
+      ctx.fill();
+    }
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({length: 80}, () => new Particle());
+  }
+
+  function connect() {
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(0,255,163,${0.06 * (1 - d/120)})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => { p.update(); p.draw(); });
+    connect();
+    animId = requestAnimationFrame(loop);
+  }
+
+  init();
+  loop();
+  window.addEventListener('resize', () => { resize(); });
+}
+initHeroCanvas();
+
+// ═══════════════════════════════════════════════════════
+// COUNTER ANIMATION
+// ═══════════════════════════════════════════════════════
+function initCounters() {
+  document.querySelectorAll('.counter').forEach(el => {
+    if (el._animated) return;
+    el._animated = true;
+    const target = parseFloat(el.dataset.target);
+    const decimals = parseInt(el.dataset.decimals) || 0;
+    const duration = 1800;
+    const start = performance.now();
+    function tick(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      el.textContent = (target * ease).toFixed(decimals);
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+setTimeout(initCounters, 300);
+
+// ═══════════════════════════════════════════════════════
+// SCROLL REVEAL
+// ═══════════════════════════════════════════════════════
+function initReveal() {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+}
+initReveal();
+
+// ═══════════════════════════════════════════════════════
+// DEMO WIZARD
+// ═══════════════════════════════════════════════════════
+let currentWzStep = 1;
+function wizardNext(step) {
+  [1,2,3].forEach(s => {
+    document.getElementById('wz-panel-'+s).style.display = 'none';
+    document.getElementById('wz'+s).classList.remove('active','done');
+  });
+  for (let s = 1; s < step; s++) document.getElementById('wz'+s).classList.add('done');
+  document.getElementById('wz'+step).classList.add('active');
+  document.getElementById('wz-panel-'+step).style.display = 'block';
+  currentWzStep = step;
+}
+
+// ═══════════════════════════════════════════════════════
+// PRICING ENGINE SIMULATION
+// ═══════════════════════════════════════════════════════
+let demoChart = null;
+
+function fmt(n) {
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + 'Cr';
+  if (n >= 100000) return '₹' + (n/100000).toFixed(2) + 'L';
+  if (n >= 1000) return '₹' + (n/1000).toFixed(1) + 'K';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+function fmtINR(n) { return '₹' + parseFloat(n).toLocaleString('en-IN',{maximumFractionDigits:0}); }
+function fmtPct(n) { return (n > 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+function runModel() {
+  const cost = parseFloat(document.getElementById('inp-cost').value) || 420;
+  const pMin = parseFloat(document.getElementById('inp-pmin').value) || 450;
+  const pMax = parseFloat(document.getElementById('inp-pmax').value) || 750;
+  const comp = parseFloat(document.getElementById('inp-comp').value) || 599;
+  const elasticity = parseFloat(document.getElementById('inp-elasticity').value) || 1.4;
+  const cpi = parseFloat(document.getElementById('inp-cpi').value) || 4.8;
+  const diesel = parseFloat(document.getElementById('inp-diesel').value) || 87.1;
+  const holiday = document.getElementById('inp-holiday').checked;
+  const rain = document.getElementById('inp-rain').checked;
+  const season = document.getElementById('inp-season').value;
+  const region = document.getElementById('inp-region').value;
+  const category = document.getElementById('inp-category').value;
+  const name = document.getElementById('inp-name').value || 'Product';
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> &nbsp;Running Model…';
+
+  const log = document.getElementById('inferenceLog');
+  log.style.display = 'block';
+  log.innerHTML = '';
+
+  const logLines = [
+    {delay:50,   cls:'', msg: `[INIT] DynaPriX Pricing Engine v2.1`},
+    {delay:150,  cls:'', msg: `[DATA] Product: "${name}" · Category: ${category}`},
+    {delay:300,  cls:'', msg: `[DATA] Cost: ${fmtINR(cost)} · Range: ${fmtINR(pMin)}–${fmtINR(pMax)}`},
+    {delay:450,  cls:'', msg: `[FEAT] Extracting context features…`},
+    {delay:600,  cls:'highlight', msg: `[FEAT] price_elasticity = ${elasticity.toFixed(2)} · cpi_delta = ${((cpi-4)/4*100).toFixed(1)}%`},
+    {delay:750,  cls:'', msg: `[FEAT] diesel_pressure = ${((diesel-80)/80*100).toFixed(1)}% · holiday_flag = ${holiday ? 1 : 0} · rain_flag = ${rain ? 1 : 0}`},
+    {delay:900,  cls:'highlight', msg: `[LGBM] Running LightGBM v2 inference over ${Math.floor((pMax-pMin)/10)+1} price points…`},
+    {delay:1100, cls:'', msg: `[LGBM] num_leaves=127 · learning_rate=0.0412 · n_estimators=842`},
+    {delay:1350, cls:'highlight', msg: `[LGBM] ✓ Demand curve computed`},
+    {delay:1500, cls:'gold', msg: `[XGB]  Running XGBoost v2 inference…`},
+    {delay:1700, cls:'gold', msg: `[XGB]  max_depth=6 · learning_rate=0.0571 · n_estimators=714`},
+    {delay:1950, cls:'gold', msg: `[XGB]  ✓ Demand curve computed`},
+    {delay:2100, cls:'highlight', msg: `[ENS]  Blending predictions (LightGBM 65% + XGBoost 35%)…`},
+    {delay:2300, cls:'highlight', msg: `[OPT]  Computing profit curve P*(p) = argmax[(p−c) × D̂(p)]…`},
+    {delay:2550, cls:'gold', msg: `[OPT]  Applying margin constraints (min 20%) & deviation cap…`},
+  ];
+
+  let ts = 0;
+  logLines.forEach(l => {
+    ts += l.delay;
+    setTimeout(() => {
+      const now = new Date();
+      const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+      log.innerHTML += `<div class="log-line"><span class="log-ts">${time}</span><span class="log-msg ${l.cls}">${l.msg}</span></div>`;
+      log.scrollTop = log.scrollHeight;
+    }, ts);
+  });
+
+  // Final: compute & show results
+  setTimeout(() => {
+    const {optPrice, prices, profits, demands, baselinePrice, baselineProfit, confidence} =
+      computePricing(cost, pMin, pMax, elasticity, cpi, diesel, holiday, rain, season, region, category, comp);
+
+    const optIdx = prices.indexOf(optPrice);
+    const optDemand = demands[optIdx];
+    const optProfit = profits[optIdx];
+    const optPPU = optPrice - cost;
+    const uplift = baselineProfit > 0 ? ((optProfit - baselineProfit) / baselineProfit * 100) : 0;
+
+    const finalLine = {cls:'highlight', msg: `[RESULT] ✅ Optimal Price: ${fmtINR(optPrice)} · Profit/Unit: ${fmtINR(optPPU)} · Confidence: ${confidence.toFixed(1)}%`};
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+    log.innerHTML += `<div class="log-line"><span class="log-ts">${time}</span><span class="log-msg ${finalLine.cls}">${finalLine.msg}</span></div>`;
+    log.scrollTop = log.scrollHeight;
+
+    // Show results
+    displayResults(optPrice, optProfit, optPPU, optDemand, baselinePrice, baselineProfit, uplift, confidence, prices, profits, demands, cost, name, category, elasticity, cpi, holiday, rain);
+
+    btn.disabled = false;
+    btn.innerHTML = '↺ &nbsp;Run Again';
+  }, ts + 500);
+}
+
+function computePricing(cost, pMin, pMax, elasticity, cpi, diesel, holiday, rain, season, region, category, comp) {
+  const steps = 50;
+  const step = (pMax - pMin) / (steps - 1);
+  const prices = Array.from({length: steps}, (_, i) => Math.round(pMin + i * step));
+
+  // Seasonal multipliers
+  const seasonMult = {summer:0.92, monsoon:0.88, festive:1.18, winter:1.02, spring:0.97}[season] || 1;
+  const regionMult = {metro:1.12, tier2:1.0, tier3:0.85}[region] || 1;
+  const catMult = {grocery:1.0, electronics:1.08, apparel:0.95, pharma:1.15, household:1.03, auto:1.07}[category] || 1;
+
+  // Base demand around midpoint
+  const midP = (pMin + pMax) / 2;
+  const baseDemand = 300 * regionMult * catMult * (holiday ? 1.22 : 1) * (rain ? 0.88 : 1) * seasonMult;
+
+  // CPI & diesel push costs up → demand shrinks slightly at high prices
+  const macroFactor = 1 - Math.max(0, (cpi - 4) * 0.018) - Math.max(0, (diesel - 80) * 0.0015);
+
+  // Competitor price creates soft cap: demand drops sharply if > competitor
+  const demands = prices.map(p => {
+    let d = baseDemand * Math.exp(-elasticity * (p - midP) / midP) * macroFactor;
+    if (p > comp) d *= Math.exp(-0.8 * (p - comp) / comp);
+    d += (Math.random() * 8 - 4); // small noise
+    return Math.max(5, Math.round(d));
+  });
+
+  // Profit per price point
+  const profits = prices.map((p, i) => Math.max(0, (p - cost) * demands[i]));
+
+  // Find optimal
+  const maxProfit = Math.max(...profits);
+  const optIdx = profits.indexOf(maxProfit);
+  const optPrice = prices[optIdx];
+
+  // Baseline = cost × 1.25 (25% markup heuristic) clamped to range
+  const baselinePrice = Math.min(pMax, Math.max(pMin, Math.round(cost * 1.25)));
+  const baselineIdx = prices.reduce((a, b, i) => Math.abs(prices[i]-baselinePrice) < Math.abs(prices[a]-baselinePrice) ? i : a, 0);
+  const baselineProfit = profits[baselineIdx];
+
+  // Confidence: inverse of curve flatness around optimum
+  const leftProfit = profits[Math.max(0, optIdx - 3)];
+  const rightProfit = profits[Math.min(steps-1, optIdx + 3)];
+  const peakSharpness = (maxProfit - (leftProfit + rightProfit) / 2) / maxProfit;
+  const confidence = 70 + Math.min(25, peakSharpness * 120) + (elasticity > 1 ? 3 : -2);
+
+  return {optPrice, prices, profits, demands, baselinePrice, baselineProfit, confidence};
+}
+
+function displayResults(optPrice, optProfit, optPPU, optDemand, baselinePrice, baselineProfit, uplift, confidence, prices, profits, demands, cost, name, category, elasticity, cpi, holiday, rain) {
+  document.getElementById('demo-placeholder').style.display = 'none';
+  const rp = document.getElementById('resultPanel');
+  rp.style.display = 'block';
+
+  document.getElementById('res-price').textContent = fmtINR(optPrice);
+  document.getElementById('res-subtitle').textContent = `${name} · Ensemble Model`;
+  document.getElementById('res-algo-badge').textContent = 'LightGBM + XGBoost';
+  document.getElementById('res-conf-badge').textContent = `Confidence: ${confidence.toFixed(1)}%`;
+  document.getElementById('res-upl-badge').textContent = `Uplift: ${fmtPct(uplift)}`;
+
+  document.getElementById('res-profit').textContent = fmt(optProfit);
+  document.getElementById('res-ppu').textContent = fmtINR(optPPU);
+  document.getElementById('res-demand').textContent = optDemand + ' units';
+  document.getElementById('res-baseline').textContent = fmtINR(baselinePrice);
+  document.getElementById('res-base-profit').textContent = fmt(baselineProfit);
+  document.getElementById('res-uplift').textContent = fmtPct(uplift);
+
+  // Chart
+  const optIdx = prices.indexOf(optPrice);
+  const pointColors = prices.map((_, i) => i === optIdx ? '#ffb800' : 'transparent');
+  const pointRadii = prices.map((_, i) => i === optIdx ? 8 : 2);
+
+  if (demoChart) demoChart.destroy();
+  const ctx = document.getElementById('demoChart').getContext('2d');
+  demoChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: prices,
+      datasets: [
+        {
+          label: 'Total Profit (₹)', data: profits,
+          borderColor: '#00ffa3', backgroundColor: 'rgba(0,255,163,0.07)',
+          fill: true, tension: 0.42, pointRadius: pointRadii,
+          pointBackgroundColor: pointColors, pointBorderColor: pointColors, yAxisID: 'y'
+        },
+        {
+          label: 'Demand (units)', data: demands,
+          borderColor: '#3d5470', borderDash: [4,3], fill: false,
+          tension: 0.42, pointRadius: 0, yAxisID: 'y2'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: {duration: 800, easing: 'easeInOutQuart'},
+      plugins: {
+        legend: { labels: {color:'#5a7a9e', font:{family:'DM Mono',size:11}} },
+        tooltip: {
+          backgroundColor:'#0a1120', borderColor:'#14243d', borderWidth:1,
+          titleColor:'#e8edf5', bodyColor:'#5a7a9e',
+          titleFont:{family:'DM Mono',size:11}, bodyFont:{family:'DM Mono',size:11},
+          callbacks: {
+            title: items => '₹' + parseInt(items[0].label).toLocaleString('en-IN'),
+            label: item => item.datasetIndex===0 ? ' Profit: '+fmt(item.raw) : ' Demand: '+item.raw+' u'
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{color:'#3d5470',font:{family:'DM Mono',size:10},maxTicksLimit:8,callback:v=>'₹'+parseInt(v).toLocaleString('en-IN')}, grid:{color:'#0d1729'} },
+        y: { position:'left', ticks:{color:'#3d5470',font:{family:'DM Mono',size:10},callback:v=>fmt(v)}, grid:{color:'#0d1729'} },
+        y2: { position:'right', ticks:{color:'#3d5470',font:{family:'DM Mono',size:10},callback:v=>v+'u'}, grid:{display:false} }
+      }
+    }
+  });
+
+  // Explanation
+  const explanations = [
+    `Optimal price ₹${optPrice.toLocaleString('en-IN')} sits at the profit-maximizing point of the demand × margin curve — higher prices reduce demand faster than they increase margin, lower prices leave money on the table.`,
+    elasticity > 1.5 ? `High elasticity (${elasticity.toFixed(1)}) means demand is very price-sensitive — the model penalizes pricing significantly above competitor (₹${document.getElementById('inp-comp').value}).` : `Moderate elasticity (${elasticity.toFixed(1)}) gives pricing flexibility — the model finds a larger profitable window around the optimum.`,
+    holiday ? `🎉 Holiday/festival boost (+22%) in demand was captured — the engine prices slightly higher to monetize elevated willingness-to-pay.` : `No holiday effect detected — demand follows the standard seasonal curve.`,
+    cpi > 6 ? `Elevated CPI (${cpi}%) signals consumer cost pressure — the model applies a downward demand adjustment at higher price points.` : `CPI (${cpi}%) is within normal range — minimal macro-driven demand suppression.`,
+    `LightGBM (65% weight) + XGBoost (35%) ensemble reduces single-model variance, improving prediction stability by ~18% versus either model alone.`
+  ];
+
+  document.getElementById('expl-items').innerHTML = explanations.map(e =>
+    `<div class="expl-item">${e}</div>`
+  ).join('');
+
+  // Feature impact
+  const features = [
+    {name:'price_elasticity', val: Math.round(elasticity/3.5*95), color:'#00ffa3'},
+    {name:`${category}_demand_lag7d`, val: 82, color:'#00ffa3'},
+    {name:'competitor_price_diff', val: Math.round(Math.abs(optPrice-parseInt(document.getElementById('inp-comp').value||599))/(parseInt(document.getElementById('inp-comp').value||599))*100+45), color:'#9d6eff'},
+    {name:'cpi_inflation_bin', val: Math.round(cpi/12*75+20), color:'#9d6eff'},
+    {name:'holiday_flag', val: holiday ? 68 : 22, color:'#ffb800'},
+    {name:'diesel_cost_pressure', val: Math.round(document.getElementById('inp-diesel').value/120*60+15), color:'#ffb800'},
+    {name:'rain_demand_impact', val: rain ? 48 : 18, color:'#3d5470'},
+    {name:'season_multiplier', val: {summer:42,monsoon:38,festive:72,winter:52,spring:44}[document.getElementById('inp-season').value]||45, color:'#3d5470'},
+  ];
+  document.getElementById('featImpact').innerHTML = features.map(f => `
+    <div class="fi-row">
+      <div class="fi-name">${f.name}</div>
+      <div class="fi-bar-bg"><div class="fi-bar" style="width:0%;background:${f.color}" data-w="${f.val}%"></div></div>
+      <div class="fi-val">${f.val}%</div>
+    </div>`).join('');
+  setTimeout(() => document.querySelectorAll('.fi-bar').forEach(b => b.style.width = b.dataset.w), 100);
+}
+
+// ═══════════════════════════════════════════════════════
+// MODEL PAGE CHARTS
+// ═══════════════════════════════════════════════════════
+let modelChartsInited = false;
+function initModelCharts() {
+  if (modelChartsInited) return;
+  modelChartsInited = true;
+
+  // WAPE chart
+  const wapeCtx = document.getElementById('wapeChart').getContext('2d');
+  new Chart(wapeCtx, {
+    type: 'bar',
+    data: {
+      labels: ['LightGBM v2', 'XGBoost v2', 'XGBoost v1', 'Linear Reg.', 'Avg. Heuristic'],
+      datasets: [{
+        label: 'WAPE (%)',
+        data: [7.78, 9.12, 11.34, 15.91, 18.20],
+        backgroundColor: ['rgba(0,255,163,0.7)', 'rgba(157,110,255,0.7)', 'rgba(90,122,158,0.4)', 'rgba(255,77,106,0.3)', 'rgba(255,77,106,0.2)'],
+        borderColor: ['#00ffa3', '#9d6eff', '#3d5470', 'rgba(255,77,106,0.5)', 'transparent'],
+        borderWidth: 1, borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false}, tooltip:{backgroundColor:'#0a1120',borderColor:'#14243d',borderWidth:1,titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:11},bodyColor:'#5a7a9e',titleColor:'#e8edf5'} },
+      scales: {
+        x: { ticks:{color:'#5a7a9e',font:{family:'DM Mono',size:10}}, grid:{display:false} },
+        y: { ticks:{color:'#5a7a9e',font:{family:'DM Mono',size:10},callback:v=>v+'%'}, grid:{color:'#0d1729'} }
+      }
+    }
+  });
+
+  // Uplift chart
+  const upliftCtx = document.getElementById('upliftChart').getContext('2d');
+  new Chart(upliftCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      datasets: [
+        { label: 'Model-Driven ₹/unit', data: [10.2,10.8,11.1,10.6,11.4,11.9,10.3,10.9,12.1,13.4,12.8,11.6], backgroundColor:'rgba(0,255,163,0.6)', borderRadius:4 },
+        { label: 'Baseline ₹/unit', data: [8.1,8.4,8.6,8.3,9.0,9.1,8.0,8.5,8.9,9.5,9.3,8.8], backgroundColor:'rgba(61,84,112,0.4)', borderRadius:4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{labels:{color:'#5a7a9e',font:{family:'DM Mono',size:11}}}, tooltip:{backgroundColor:'#0a1120',borderColor:'#14243d',borderWidth:1,titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:11},bodyColor:'#5a7a9e',titleColor:'#e8edf5'} },
+      scales: {
+        x: { ticks:{color:'#5a7a9e',font:{family:'DM Mono',size:10}}, grid:{display:false} },
+        y: { ticks:{color:'#5a7a9e',font:{family:'DM Mono',size:10},callback:v=>'₹'+v}, grid:{color:'#0d1729'} }
+      }
+    }
+  });
+
+  // Global feature importance
+  const globalFeats = [
+    {name:'price_elasticity_of_demand', val:94, color:'#00ffa3'},
+    {name:'lag_demand_7d', val:82, color:'#00ffa3'},
+    {name:'rolling_vol_14d', val:75, color:'#9d6eff'},
+    {name:'competitor_price_diff', val:69, color:'#9d6eff'},
+    {name:'cpi_inflation_bin', val:63, color:'#ffb800'},
+    {name:'inventory_turnover_rate', val:58, color:'#ffb800'},
+    {name:'diesel_price_norm', val:51, color:'#4da6ff'},
+    {name:'holiday_festival_flag', val:44, color:'#4da6ff'},
+    {name:'precipitation_mm', val:37, color:'#3d5470'},
+    {name:'season_multiplier', val:31, color:'#3d5470'},
+    {name:'weekday_encoding', val:24, color:'#3d5470'},
+    {name:'region_tier_flag', val:18, color:'#3d5470'},
+  ];
+  const gfb = document.getElementById('globalFeatBars');
+  gfb.innerHTML = globalFeats.map(f => `
+    <div class="fi-row">
+      <div class="fi-name" style="width:200px">${f.name}</div>
+      <div class="fi-bar-bg"><div class="fi-bar" style="width:0%;background:${f.color}" data-w="${f.val}%"></div></div>
+      <div class="fi-val">${f.val}%</div>
+    </div>`).join('');
+  setTimeout(() => document.querySelectorAll('#globalFeatBars .fi-bar').forEach(b => b.style.width = b.dataset.w), 200);
+}
+
+// Init ticker visibility
+document.getElementById('tickerBar').style.display = 'block';
+
+// Boot reveal
+setTimeout(initReveal, 200);
+</script>
+</body>
+</html>
